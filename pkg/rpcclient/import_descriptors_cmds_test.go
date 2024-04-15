@@ -3,13 +3,14 @@ package rpcclient
 import (
 	"errors"
 	"fmt"
-	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/rpcclient"
 	"log"
 	"testing"
+
+	"github.com/aravinddojima/btcd/btcec"
+	"github.com/aravinddojima/btcd/btcjson"
+	"github.com/aravinddojima/btcd/btcutil"
+	"github.com/aravinddojima/btcd/chaincfg"
+	"github.com/aravinddojima/btcd/rpcclient"
 )
 
 func TestImportDescriptorsCmds(t *testing.T) {

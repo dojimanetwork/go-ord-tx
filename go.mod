@@ -1,12 +1,12 @@
 module github.com/vincentdebug/go-ord-tx
 
-go 1.20
+go 1.18
 
 require (
-	github.com/btcsuite/btcd v0.23.4
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2
-	github.com/btcsuite/btcd/btcutil v1.1.3
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
+	github.com/aravinddojima/btcd v0.23.5-0.20240314055641-3ad883825b06
+	github.com/aravinddojima/btcd/btcec v0.0.0
+	github.com/aravinddojima/btcd/btcutil v0.0.0
+	github.com/aravinddojima/btcd/chaincfg/chainhash v0.0.0
 	github.com/pkg/errors v0.9.1
 )
 

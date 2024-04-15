@@ -2,8 +2,9 @@ package rpcclient
 
 import (
 	"encoding/json"
-	"github.com/btcsuite/btcd/btcjson"
-	"github.com/btcsuite/btcd/rpcclient"
+
+	"github.com/aravinddojima/btcd/btcjson"
+	"github.com/aravinddojima/btcd/rpcclient"
 )
 
 type Descriptor struct {
