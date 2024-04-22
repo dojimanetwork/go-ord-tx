@@ -40,6 +40,7 @@ type InscriptionRequest struct {
 	SingleRevealTxOnly bool // Currently, the official Ordinal parser can only parse a single NFT per transaction.
 	// When the official Ordinal parser supports parsing multiple NFTs in the future, we can consider using a single reveal transaction.
 	RevealOutValue int64
+	AvailableSats  int64
 }
 
 type inscriptionTxCtxData struct {
@@ -65,6 +66,7 @@ type InscriptionTool struct {
 	revealTxPrevOutputFetcher *txscript.MultiPrevOutFetcher
 	RevealTx                  []*wire.MsgTx
 	CommitTx                  *wire.MsgTx
+	AvailableSats             int64
 }
 
 const (
@@ -84,6 +86,7 @@ func NewInscriptionTool(net *chaincfg.Params, rpcclient *rpcclient.Client, reque
 		txCtxDataList:             make([]*inscriptionTxCtxData, len(request.DataList)),
 		commitTxPrivateKeyList:    request.CommitTxPrivateKeyList,
 		revealTxPrevOutputFetcher: txscript.NewMultiPrevOutFetcher(nil),
+		AvailableSats:             request.AvailableSats,
 	}
 	return tool, tool._initTool(net, request)
 }
@@ -127,6 +130,11 @@ func (tool *InscriptionTool) _initTool(net *chaincfg.Params, request *Inscriptio
 	if err != nil {
 		return err
 	}
+
+	// err = tool.signCommitTx()
+	// if err != nil {
+	// 	return err
+	// }
 
 	err = tool.completeRevealTx()
 	if err != nil {
@@ -243,15 +251,20 @@ func (tool *InscriptionTool) buildEmptyRevealTx(singleRevealTxOnly bool, destina
 			emptySignature := make([]byte, 64)
 			emptyControlBlockWitness := make([]byte, 33)
 			for i := 0; i < total; i++ {
-				fee := (int64(wire.TxWitness{emptySignature, tool.txCtxDataList[i].inscriptionScript, emptyControlBlockWitness}.SerializeSize()+2+3) / 4) * feeRate
+				witness_component_fee := (int64(wire.TxWitness{emptySignature, tool.txCtxDataList[i].inscriptionScript, emptyControlBlockWitness}.SerializeSize()+2+3) / 4) * feeRate
 				tool.txCtxDataList[i].revealTxPrevOutput = &wire.TxOut{
 					PkScript: tool.txCtxDataList[i].commitTxAddressPkScript,
-					Value:    revealOutValue + eachRevealBaseTxFee + fee,
+					Value:    revealOutValue + eachRevealBaseTxFee + witness_component_fee,
 				}
-				prevOutput += fee
+				prevOutput += witness_component_fee
 			}
 		}
 		totalPrevOutput = prevOutput
+		fmt.Println("fee for reveal transaction ----------------->", totalPrevOutput)
+		tool.AvailableSats -= totalPrevOutput
+		if tool.AvailableSats < 0 {
+			return 0, fmt.Errorf("not enough sats to build epmty_reveal_transaction")
+		}
 		revealTx[0] = tx
 	} else {
 		revealTx = make([]*wire.MsgTx, total)
@@ -338,7 +351,15 @@ func (tool *InscriptionTool) buildCommitTx(commitTxOutPointList []*wire.OutPoint
 
 	tx.AddTxOut(wire.NewTxOut(0, *changePkScript))
 	fee := btcutil.Amount(mempool.GetTxVirtualSize(btcutil.NewTx(tx))) * btcutil.Amount(commitFeeRate)
-	changeAmount := totalSenderAmount - btcutil.Amount(totalRevealPrevOutput) - fee
+	fmt.Println("fee for commit transaction ----------------->", fee)
+	tool.AvailableSats -= int64(fee)
+	if tool.AvailableSats < 0 {
+		return errors.New("unable to build commit_tx due to insufficient sats")
+	}
+
+	tx.TxOut[0].Value += tool.AvailableSats
+	tool.RevealTx[0].TxOut[0].Value += tool.AvailableSats
+	changeAmount := totalSenderAmount - btcutil.Amount(totalRevealPrevOutput) - fee - btcutil.Amount(tool.AvailableSats)
 	if changeAmount > 0 {
 		tx.TxOut[len(tx.TxOut)-1].Value = int64(changeAmount)
 	} else {
@@ -394,6 +415,7 @@ func (tool *InscriptionTool) completeRevealTx() error {
 	}
 	// check tx max tx wight
 	for i, tx := range tool.RevealTx {
+
 		revealWeight := blockchain.GetTransactionWeight(btcutil.NewTx(tx))
 		if revealWeight > MaxStandardTxWeight {
 			return errors.New(fmt.Sprintf("reveal(index %d) transaction weight greater than %d (MAX_STANDARD_TX_WEIGHT): %d", i, MaxStandardTxWeight, revealWeight))
