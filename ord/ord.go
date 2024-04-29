@@ -145,11 +145,11 @@ func (tool *InscriptionTool) _initTool(net *chaincfg.Params, request *Inscriptio
 }
 
 func (tool *InscriptionTool) createInscriptionTxCtxData(net *chaincfg.Params, data InscriptionData) (*inscriptionTxCtxData, error) {
-	// privateKey, err := btcec.NewPrivateKey()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	privateKey := tool.commitTxPrivateKeyList[0]
+	privateKey, err := btcec.NewPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+	// privateKey := tool.commitTxPrivateKeyList[0]
 	inscriptionBuilder := txscript.NewScriptBuilder().
 		AddData(schnorr.SerializePubKey(privateKey.PubKey())).
 		AddOp(txscript.OP_CHECKSIG).
@@ -345,10 +345,12 @@ func (tool *InscriptionTool) buildCommitTx(commitTxOutPointList []*wire.OutPoint
 
 		totalSenderAmount += btcutil.Amount(txOut.Value)
 	}
+	// adding incription txout first
 	for i := range tool.txCtxDataList {
 		tx.AddTxOut(tool.txCtxDataList[i].revealTxPrevOutput)
 	}
 
+	// adding change address txOut
 	tx.AddTxOut(wire.NewTxOut(0, *changePkScript))
 	fee := btcutil.Amount(mempool.GetTxVirtualSize(btcutil.NewTx(tx))) * btcutil.Amount(commitFeeRate)
 	fmt.Println("fee for commit transaction ----------------->", fee)
